@@ -1,0 +1,102 @@
+#
+# données de ventes BNV-D
+# https://www.data.gouv.fr/fr/datasets/ventes-de-pesticides-par-departement/
+#
+library(stringr)
+#
+BNVD2008=read.table("BNVD_2008.txt",header=T,dec=",",colClasses=c("character","character","character","character","character","numeric","character"))
+BNVD2009=read.table("BNVD_2009.txt",header=T,dec=",",colClasses=c("character","character","character","character","character","numeric","character"))
+BNVD=rbind(BNVD2008,BNVD2009)
+BNVD2010=read.table("BNVD_2010.txt",header=T,dec=",",colClasses=c("character","character","character","character","character","numeric","character"))
+BNVD=rbind(BNVD,BNVD2010)
+BNVD2011=read.table("BNVD_2011.txt",header=T,dec=",",colClasses=c("character","character","character","character","character","numeric","character"))
+BNVD=rbind(BNVD,BNVD2011)
+BNVD2012=read.table("BNVD_2012.txt",header=T,dec=",",colClasses=c("character","character","character","character","character","numeric","character"))
+BNVD=rbind(BNVD,BNVD2012)
+BNVD2013=read.table("BNVD_2013.txt",header=T,dec=",",colClasses=c("character","character","character","character","character","numeric","character"))
+BNVD=rbind(BNVD,BNVD2013)
+BNVD2014=read.table("BNVD_2014.txt",header=T,dec=",",colClasses=c("character","character","character","character","character","numeric","character"))
+BNVD=rbind(BNVD,BNVD2014)
+BNVD2015=read.table("BNVD_2015.txt",header=T,dec=",",colClasses=c("character","character","character","character","character","numeric","character"))
+BNVD=rbind(BNVD,BNVD2015)
+BNVD2016=read.table("BNVD_2016.txt",header=T,dec=",",colClasses=c("character","character","character","character","character","numeric","character"))
+BNVD=rbind(BNVD,BNVD2016)
+BNVD2017=read.table("BNVD_2017.txt",header=T,dec=",",colClasses=c("character","character","character","character","character","numeric","character"))
+BNVD=rbind(BNVD,BNVD2017)
+BNVD2018=read.table("BNVD_2018.txt",header=T,dec=",",colClasses=c("character","character","character","character","character","numeric","character"))
+BNVD=rbind(BNVD,BNVD2018)
+BNVD2019=read.table("BNVD_2019.txt",header=T,dec=",",colClasses=c("character","character","character","character","character","numeric","character"))
+BNVD=rbind(BNVD,BNVD2019)
+# Nb. d'enregistrements de BNV-D:
+nrow(BNVD)
+#
+BNVD$substance=as.character(BNVD$substance)
+# somme des quantités par année, n° AMM, substance, classification
+BNVD_YASC=aggregate(BNVD$quantite_substance,by=list(BNVD$annee,BNVD$amm,BNVD$substance,BNVD$classification),sum)
+colnames(BNVD_YASC)=c("annee","AMM","substance","classification","quantite_substance")
+#
+# on ajoute les usages décrits pour chaque AMM
+# usages: https://www.data.gouv.fr/fr/datasets/usages-des-produits-phytosanitaires/
+#
+Usage=read.table("AMM_usages_2018_data.gouv.txt",header=T)
+BNVD_YASCU=merge(BNVD_YASC,Usage,by.x="AMM",by.y="amm")
+#
+#
+# on ajoute l'information sur le statut "Biocontrôle" du produit
+# La dernière liste [des produits de biocontrôle, NDLR] actuellement en vigueur a été publiée le 18/12/2020 : DGAL/SDQSPV/2020-355 (PDF, 690.33 Ko) 
+# https://agriculture.gouv.fr/quest-ce-que-le-biocontrole
+#
+BioControle=read.table("Biocontrole_12-2020.txt",header=T)
+colnames(BioControle)=c("AMM","Group_BioC","Type_BioC","Substance_BioC")
+BNVD_YASCUB=merge(BNVD_YASCU,BioControle,by.x="AMM",by.y="AMM",all.x=TRUE)
+write.table(BNVD_YASCUB,"BNVD_YASCUB.txt",dec=",")
+#
+BNVD_BioC=merge(BNVD,BioControle,by.x="amm",by.y="AMM",all.x=TRUE)
+BNVD_BioC$Type_BioC=ifelse(is.na(BNVD_BioC$Type_BioC),"NON_BioC",as.character(BNVD_BioC$Type_BioC))
+BNVD_BioC=merge(BNVD_BioC,Usage,by.x="amm",by.y="amm",all.x=TRUE)
+BNVD_BioC_DY=aggregate(BNVD_BioC$quantite_substance,by=list(BNVD_BioC$departement,BNVD_BioC$annee,BNVD_BioC$usages,BNVD_BioC$classification,BNVD_BioC$Type_BioC),sum)
+colnames(BNVD_BioC_DY)=c("departement","annee","Type_BioC","classification","Usages","quantite_substance")
+RegNames=read.table("Regions.txt",colClasses=c("character","character","character","character","character","character"),header=T)
+RegDep=read.table("Regions_Depts.txt",colClasses=c("character","character","character","character","character","character","character"),header=T)
+#
+# pour homogénéiser le nom des départements entre les tables BNVD_BioC_DY et RegDep avant fusion
+RegDep$NomDep=str_replace_all(RegDep$ncc,"_","-")
+BNVD_BioC_DY$Dept=str_replace_all(BNVD_BioC_DY$departement,"_","-")
+BNVD_BioC_DY$Dept=str_replace_all(BNVD_BioC_DY$Dept,"'","-")
+#
+BNVD_BioC_DY2=merge(BNVD_BioC_DY,RegDep,by.x="Dept",by.y="NomDep",all.x=TRUE)
+BNVD_BioC_DY3=merge(BNVD_BioC_DY2,RegNames,by.x="reg",by.y="reg",all.x=TRUE)
+BNVD_BioC_DY3=cbind(BNVD_BioC_DY3[1],BNVD_BioC_DY3[17],BNVD_BioC_DY3[2],BNVD_BioC_DY3[9],BNVD_BioC_DY3[4:8])
+colnames(BNVD_BioC_DY3)=c("Code_Reg","Region","Dept","Code_Dept","Annee","Usage","Classification","Type_BioC","Quantite_substance")
+write.table(BNVD_BioC_DY3,dec=",","BNVD_BioC_DY3.txt")
+# recherche des substances nouvellement apparues en telle année:
+# quantité positive en année N et nulle en année N-1
+# 
+# Aggrégation par substance
+#
+BNVD_YASCUBS=aggregate(BNVD_YASCUB$quantite_substance,by=list(BNVD_YASCUB$substance,BNVD_YASCUB$annee),sum)
+colnames(BNVD_YASCUBS)=c("substance","annee","quantite_substance")
+count=0
+for (an in c(2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019))
+{
+print(paste("année",an))
+list=subset(BNVD_YASCUBS,BNVD_YASCUBS$annee==an&BNVD_YASCUBS$quantite_substance>0)
+new=merge(list,BNVD_YASCUBS,by="substance",all.x=TRUE,all.y=FALSE)
+new=subset(new,new$annee.y==an-1)
+colnames(new)=c("substance","annee_N","quantite_substance_N","annee_N_1","quantite_substance_N_1")
+new=merge(new,list,by="substance",all.y=TRUE)
+new=cbind(new[1],new[4:7])
+new$annee_N_1=ifelse(is.na(new$annee_N_1),an-1,new$annee_N_1)
+new$quantite_substance_N_1=ifelse(is.na(new$quantite_substance_N_1),0, new$quantite_substance_N_1)
+head(new)
+if (nrow(new)==0){next} else {
+new=subset(new,new$quantite_substance_N_1==0)
+print(head(new))
+count=count+1
+if (count==1) {NEW=new} else {NEW=rbind(NEW,new)}
+}
+}
+# On va ensuite rechercher les données pour toutes les années suivantes
+NEW_detail=merge(NEW,BNVD_YASCUBS,by="substance",all.x=TRUE)
+write.table(NEW_detail,"NEW_detail.txt")
+

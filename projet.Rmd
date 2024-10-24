@@ -1,0 +1,459 @@
+---
+title: "La consommation de glyphosate en France"
+author: "Lancelot Ravier"
+date: "2024-043-27"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r,  include=FALSE}
+library("lubridate")
+library("magrittr")
+library("ggplot2")
+library("ggpubr")
+library("rticles")
+library("hrbrthemes")
+library("forcats")
+library("ggridges")
+library("cowplot")
+library("ggthemes")
+library("fmsb")
+library("wesanderson")
+library("knitr", "rmarkdown", "markdown")
+library("tidyverse")
+library("tidyr")
+library("dplyr")
+library("plotly")
+library("paletteer")
+library("extrafont")
+library("kableExtra")
+library('data.table')
+library("readxl")
+library("jtools")
+library("ggrepel")
+library("fastDummies")
+library("xtable")
+library("sjPlot")
+library("sjmisc")
+library("sjlabelled")
+library("lmtest")
+library("modelsummary")
+library("kableExtra")
+library("gt")
+library("corrplot")
+library("mice")
+library("sandwich")
+library("psych")
+library("performance")
+library("see")
+library("patchwork")
+library("stargazer")
+library("car")
+library("nlme")
+tz <- Sys.timezone()
+
+```
+
+```{r setup, include=FALSE,results = 'hide',message=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width=3, fig.height=2.5,fig.pos ="ht", out.width = '50%',out.extra = "",fig.align = 'center')
+getOption('xtable.comment',TRUE)
+
+knitr::opts_chunk$set(echo = FALSE) # By default, hide code; set to TRUE to see code
+knitr::opts_chunk$set(fig.pos = 'p') # Places figures on their own pages
+knitr::opts_chunk$set(out.width = '100%', dpi=300) # Figure resolution and size
+knitr::opts_chunk$set(fig.env="figure") # Latex figure environment
+
+
+setwd("~/Documents/GitHub/glyphosate")
+
+```
+
+# 1 Introduction
+
+Le glyphosate, découvert en 1970 et commercialisé dès 1974 en France (notament sous le nom Roundup), est devenu l'herbicide le plus utilisé à travers le monde, tant dans le secteur agricole que chez les particuliers. Sa popularité s'explique par son efficacité remarquable à éradiquer les mauvaises herbes et les plantes indésirables dans une grande variété de milieux, des vastes champs agricoles aux jardins privés. Toutefois, l'utilisation généralisée de cet herbicide n'est pas sans controverses. D'importantes inquiétudes ont été soulevées concernant ses effets potentiellement cancérigènes, des études scientifiques ayant mis en lumière des liens entre l'exposition au glyphosate et certains types de cancer chez l'humain.
+
+Face à ces risques sanitaires, l'Union Européenne a progressivement adopté une position plus restrictive, envisageant même une interdiction totale de l'herbicide malgré les débats scientifiques et politiques toujours en cours. La France, malgré la pression internationale et les recommandations de l'UE, a montré une certaine réticence à bannir complètement l'usage du glyphosate. Cette position s'explique principalement par la forte dépendance des agriculteurs français au glyphosate, dont l'efficacité quasnment inégalée permet de soutenir la productivité agricole tout en limitant les coûts. De plus, le défi de trouver des alternatives aussi efficaces et économiquement viables reste considérable.
+
+Dans ce contexte, notre projet de recherche vise à examiner de manière approfondie l'impact de divers facteurs agricoles sur les quantités de glyphosate achetées en France. Nous analysons les données agrégées par département pour estimer les ventes de glyphosate, en nous appuyant sur des variables telles que la surface agricole utilisée, la production brute standard, et la part des cultures spécifiques comme les vignes et les céréales. Ce cadre économetrique offre une perspective précieuse pour comprendre les dynamiques d'utilisation du glyphosate et pour éclairer les discussions sur les politiques agricoles et environnementales futures.
+
+Quels-sont les déterminants de la consommation de Glyphosate en France
+métropolitaine ?
+
+# 2 Données
+
+Nom des bases de données originales :
+
+glyphosate (source :
+<https://ventes-produits-phytopharmaceutiques.eaufrance.fr/search?filetype=Achats>)
+
+vignes
+(<https://agreste.agriculture.gouv.fr/agreste-web/disaron/Carte-RA-partvigne20/detail/>)
+
+pbs
+(<https://agreste.agriculture.gouv.fr/agreste-web/disaron/Carte-RA-pbs20/detail/>)
+
+sau
+(<https://agreste.agriculture.gouv.fr/agreste-web/disaron/Carte-RA-sau20/detail/>)
+
+cereales
+(<https://agreste.agriculture.gouv.fr/agreste-web/disaron/Carte-RA-partcereoleopro20/detail/>)
+
+Nom de la base de données agrégée : data
+
+## 2.1 Variables
+
+annee - 2020
+
+code_departement - numéro indicatif pour chaque département
+
+departement - nom du département
+
+pbs - production brut standard, production potentielle totale des
+exploitations par département, résultent des valeurs moyennes des
+rendements et des prix observés sur la période 2015 à 2019, exprimé en
+euros.
+
+sau - superficie agricole utilisée (en ha.), comprenant les céréales,
+les oléagineux, protéagineux et plantes à fibres, les autres plantes
+industrielles destinées à la transformation, les cultures fourragères et
+les surfaces toujours en herbe, les légumes secs et frais, les fraises
+et les melons, les pommes de terre, les fleurs et plantes ornementales,
+les vignes, les autres cultures permanentes (vergers, petits fruits,
+pépinières ligneuses), les jachères, les jardins et vergers familiaux.
+
+cereales - part des cereales et oléagineux dans la sau (en %)
+
+vignes - part de vignes dans la sau (en %)
+
+glyphosate - quantité totale (en kg) de glyphosate achetée
+
+## 2.2 Import et fusion des différentes bases de données
+
+```{r}
+glyphosate <- read.csv2("data/glyphosate.csv")
+vignes <- read.csv2("data/vignes.csv")
+cereales <- read.csv2("data/cereales.csv")
+pbs <- read.csv2("data/pbs.csv")
+sau <- read.csv2("data/sau.csv")
+```
+
+```{r}
+data <- inner_join(glyphosate, vignes, by = "code_departement")
+data <- inner_join(data, cereales, by = "code_departement")
+data <- inner_join(data, pbs, by = "code_departement")
+data <- inner_join(data, sau, by = "code_departement")
+```
+
+## 2.3 Visualisation des données
+
+```{r}
+datasummary_skim(data)
+```
+
+Certaines observations sont manquantes pour la variable vignes (due au
+secret statistique). Il est nécessaire de tratier ces valeurs manquantes
+avant toute analyse de données car ces dernières rendent toute analyse
+graphique impossible.
+
+## 2.4 Traitement des valeurs manquantes
+
+```{r}
+data <- mutate_all(data, ~ replace(., is.na(.), 0))
+```
+
+Les valeurs manquantes pour la variable vignes sont dues au secret
+statistique (moins de 3 cultures de vignes). Ainsi, nous pouvons
+remplacer ves valeurs manquantes par des 0.
+
+## 2.5 Creation de variables
+
+```{r}
+data <- data %>%
+  mutate(log_pbs = log(pbs)) %>%
+  mutate(log_sau = log(sau)) %>%
+  mutate(log_glyphosate = log(glyphosate))
+```
+
+La base de donnée finale contient maintenant certaines variables
+ajoutées (log).
+
+# 3 Analyse des données
+
+## 3.1 Analyse générale
+
+```{r}
+data <- data[, !names(data) %in% c("annee")]
+describe(data)
+```
+
+Pour l'année 2020,
+
+La quantité moyenne de glyphosate acheté par département est de 88445.47
+kg. La Charente maritime est le premier acheteur de glyphosate
+(347598.1719 kg). La Marne arrive en 3ème position.
+
+la PBS moyenne d'un département français est de 668782.6€, variant de
+103€ dans les Hauts de Seine (92) à 2685717€ en Marne (51). L'écart-type
+est de 53075€. La distribution est asymétrique à droite (skew = 1.45) et
+leptokurtique (kurtosis = 2.51) suggérant des ecarts à la moyenne
+supérieurs à ceux d'une distribution normale.
+
+La SAU moyenne est de 278601.9 Ha, allant de 1 Ha pour Paris (75), à
+557179 pour la Marne (51). L'ecart-type est de 14608.16 ha. La
+distribution est légèrement asymétrique à gauche, et platykurtique
+(kurtosis = -1.01), suggérant un nombre e'écarts à la moyenne inférieurs
+que dans une distribution normale.
+
+En moyenne, 38.35% de la SAU est destinée à la culture de céréales, et
+4.28% de la SAU destinée à la culture viticole. C'ets en Eure et Loire
+que la part de SAU consacrée à la culture de céréalés est la plus grande
+(84.9%) et c'est en Gironde que la part de la SAU consacrée à la culture
+de vignes est la plus grande (50.1%).
+
+## 3.2 Matrice de corrélation
+
+```{r, echo=FALSE, fig.width=6, fig.height=6}
+data_numeric <- data[sapply(data, is.numeric)]
+mcor <- cor(data_numeric, use = "complete.obs")
+corrplot(mcor, method = "number", type = "upper", order = "hclust",
+         tl.col = "black")
+```
+
+Toutes les variables ont une corellation positive avec glyphosate. LCette relation est modérée pour les variables cereales, pbs, sau et faible pour la variable vignes.
+
+D’après la matrice de corrélation, aucune corrélation trop élevée n’est détectée sauf
+entre pbs et sau, expliquée par le fait que la production d’une exploitation est
+forcément corrélée à sa taille. Le risque d’overfitting peut donc être écarté.
+
+```{r, echo=FALSE, fig.width=5, fig.height=5}
+ggplot(data) +
+ aes(x = pbs, y = glyphosate) +
+ geom_smooth(method = "lm", se = FALSE, color = 'red') +
+ geom_smooth(method = "lm", formula = y ~ I(x^2), se = FALSE) +
+ geom_point(shape = "circle", size = 1.5, colour = "#0C4C8A") +
+ theme_minimal()
+```
+```{r, echo=FALSE, fig.width=5, fig.height=5}
+ggplot(data) +
+ aes(x = sau, y = glyphosate) +
+ geom_smooth(method = "lm", se = FALSE, color = 'red') +
+ geom_smooth(method = "lm", formula = y ~ I(x^2), se = FALSE) +
+ geom_point(shape = "circle", size = 1.5, colour = "#0C4C8A") +
+ theme_minimal()
+```
+```{r, echo=FALSE, fig.width=5, fig.height=5}
+ggplot(data) +
+ aes(x = cereales, y = glyphosate) +
+ geom_smooth(method = "lm", se = FALSE, color = 'red') +
+ geom_smooth(method = "lm", formula = y ~ I(x^2), se = FALSE) +
+ geom_point(shape = "circle", size = 1.5, colour = "#0C4C8A") +
+ theme_minimal()
+```
+```{r, echo=FALSE, fig.width=5, fig.height=5}
+ggplot(data) +
+ aes(x = vignes, y = glyphosate) +
+ geom_smooth(method = "lm", se = FALSE, color = 'red') +
+ geom_smooth(method = "lm", formula = y ~ I(x^2), se = FALSE) +
+ geom_point(shape = "circle", size = 1.5, colour = "#0C4C8A") +
+ theme_minimal()
+```
+
+D'après ces graphiques, des relations non-linéaires (carré) peuvent ètre observées entre les variables explicatives et glyphosate. Il serait donc pertinent de tester la présence de relations non-linéaire et d'inclure certaines variables au carré dans nos futurs modèles, afin de modéliser et prendre en compte ces effets dans nos estmations. 
+
+# 4 Modèles et test
+
+## 4.1 Equation à estimer
+
+L'équation à estimée est la suivante :
+
+$log\_glyphosate = \beta_0 + \beta_1 * log\_pbs + \beta_2 * log\_sau + \beta_3 * cereales + \beta_4 * vignes + u$
+
+Le paramètre lié à pbs est une élasticité (variation en % lorsque le pbs
+augmente de 1%, ceteris paribus). Le signe du paramètre devrait ètre
+positif. En effet, la production est importante, plus le recours au
+glyphosate serait nécessaire pour protéger et assurer les récoltes aux
+enjeux davantage importnat que leur taille serait conséquente.
+
+Le paramètre lié à sau est une élasticité (variation en % lorsque la sau
+augmente de 1%, ceteris paribus). Le signe du paramètre devrait ètre
+positif. En effet, plus la superficie agricole utilisée est importante,
+plus l'utilisaton de glyphosate sera importante, ce dernier étant
+utilisé sur une superficie plus grande.
+
+Les paramètres liés à cereales et vignes sont des semi-elésticités
+(variation de (beta\*100)% lorsque vigne/ cereales augmente d'une
+unité). Le signe du paramètre lié à vignes et cereales devrait aussi
+ètre positif car le glyphosate est principalement utilisé dans les
+vignes et les cultures de céréales.
+
+## 4.2 Modèle MCO
+```{r}
+mco1 <- lm(log_glyphosate ~ log_pbs + log_sau + cereales + vignes, data = data)
+
+modelsummary(mco1,
+  estimate = c("{estimate} ({std.error}) {stars}"), 
+  statistic = 'conf.int', conf_level = 0.95)
+```
+
+Afin de valider les résultats de ce premier modèle, il est nécessaire de vérifier le respect des hypothèses économétriques.
+
+## 4.3 Hypothèses
+### 4.3.1 H1 : Espérance de l'erreur nulle
+
+```{r}
+res1 <- residuals(mco1)
+t.test(res1)
+```
+
+D'après ce test, l'espérance du terme d'erreur n'est pas significativement différente de 0. L'hypothèse H1 est donc respectée.
+
+### 4.3.2 H2 : Perturbations heteroscedastiques
+
+```{r, echo=FALSE, fig.width=5, fig.height=5}
+res1 <- residuals(mco1)
+qqnorm(res1)
+qqline(res1, col = 'red')
+```
+
+Les résidus ne suivent pas exactement une loi normale centrée réduite. Afin de s'assurer du calcul non faussé de la matrice var-cov ainsi que le clcul des tests qui en découelnt, il est nécessaire de vérifier la présence d'heteroscedasticité des perturbations.
+
+```{r, echo=FALSE, fig.width=5, fig.height=5}
+plot(fitted(mco1), resid(mco1),
+     xlab = "Valeurs ajustées", ylab = "Résidus",
+     main = "Résidus vs. Valeurs ajustées")
+```
+
+D'après ce graphique, nous pourrions ètre en présence
+d'heteroscedasticité des perturbations (dispersion croissante).
+
+```{r}
+check_heteroskedasticity(mco1)
+```
+
+Le test de Breuch-Pagan vient confirmer la présence d'heteroscedasticité des perturbations précédemment visualisée. La matrice des variances covariances doit ètre corrigée afin de réaliser une inférence statistique fiable. 
+
+### 4.3.3 H3 : Variables mesurées avec erreur
+
+Certanies des variables de notre modèle pourraient ètre mesurées avec erreur.
+
+  - La variable pbs pourrait ètre coréllée avec le terme d'erreur dans le cas où des facteurs non observés influenceraient à la fois la pbs et l'achat de glyphosate, où dans le cas présent car la pbs inclut toutes les exploitations par département, mèmes celles n'utilisant pas de glyphosate.
+  
+  - La variable sau pourrait ètre coréllée avec le terme d'erreur dans le cas où es facteurs non mesurés affecteraient à la fois la sau et 'achat de glyphosate (politiques agricoles spécifiques, conditions météorologiques extrèmes)
+  
+  - Les variables cereales et vignes euvent aussi ètre sujettes à endogénéité dans le cas où, par exemple, certaines cultures nécéssiteraient davantage d'herbicides que d'autres, où si des pratiques agricoles spécifiques sont corélées à la fois avec la composition de la sau et l'achat de glyphosate. 
+  
+  
+Dans le cadre de notre modèle mco1, la variable succeptible d'ètre mesurée avec erreur est la variable sau. En effet, le paramètre lié à log_sau est de signe négatif, ce qui va à l'encontre de nos intuitions économique de départ. De plus, ce paramètre est significatif au seuil de 5%, ce qui écarte la non-significativité du paramètre. La base de données analysée ne permet pas d'effectuer des tests quant à l'utilisation de variables instrulmentales (corélées avec sau, non corélés avec le terme d'erreur). 
+
+### 4.3.4 H4 : Spécification du modèle
+
+Afin de tester la bonne spécification de notre modèle, certaines variables au carré ont été créés. 
+
+```{r}
+data <- data %>%
+  mutate(sq_log_pbs = log(pbs)^2) %>%
+  mutate(sq_log_sau = log(sau)^2) %>%
+  mutate(sq_cereales = cereales^2) %>%
+  mutate(sq_vignes = vignes^2)
+```
+
+```{r}
+resettest(mco1, power = 2, type = "regressor")
+```
+
+D'après le test RESET et les analyses graphiques réalisées en section 3, le modèle n'est pas correctement spécifié car certaines relations non-linéaires (au carré) ne sont pas prises en compte dans l'estimation. 
+
+```{r}
+mco_reset_1 <- lm(log_glyphosate ~ log_pbs + log_sau + cereales + vignes + sq_log_pbs + sq_log_sau + sq_cereales + sq_vignes, data = data)
+resettest(mco_reset_1, power = 2, type = "regressor")
+coeftest(mco_reset_1, vcov = vcovHC, type = "HC1")
+```
+
+D'après le coeftest, seul la variable sq_log_pbs n'est pas significative. Ainsi, il semble pertinent de la supprimer pour voir l'effet sur les résultats du test RESET.
+
+```{r}
+mco_reset_2 <- lm(log_glyphosate ~ log_pbs + log_sau + cereales + vignes + sq_log_sau + sq_cereales + sq_vignes, data = data)
+resettest(mco_reset_2, power = 2, type = "regressor")
+coeftest(mco_reset_2, vcov = vcovHC, type = "HC1")
+```
+Avant d'interpréter les résultats du modèle, il est nécessaire de vérifier la colinéarité entre les variables ajoutées.
+```{r echo=TRUE}
+vif(mco_reset_2)
+```
+
+La colinéarité trop haute entre les variables augmente considérablement le risque d'overfitting. Ainsi, nous faisons le choix de ne pas inclure de variables au carré dans notre modèle, malgré la présence de relations non-linéaires. Ainsi, le modèle estimé sera davantage adaptable à d'autres bases de données car moins afin de présenter u risque de surajustement.
+
+### 4.3.5 H5 : Variable X non constante
+
+```{r echo=TRUE}
+apply(data_numeric, 2, var)
+```
+
+D'après ces résultats, aucune des variables n'est constante (variances différentes de 0).
+
+# 5 Modèle final : interprétations et performance
+
+```{r}
+cov1 <- vcovHC(mco1, type = "HC1")
+robust_se <- sqrt(diag(cov1))
+stargazer(mco1, type = "text", se = list(robust_se, NULL))
+```
+
+L'équation estimée est la suivante :
+$\widehat{log\_glyphosate} = 2.284 - 0.349 * log\_sau + 0.927 * log\_pbs + 0.020 * cereales + 0.016 * vignes$
+
+## 5.1 Interprétation des parmaètres
+
+Lorsque tout les paramètres sont égaux à 0, le log_glyphosate est de 2.284.
+
+Lorsque la pbs augmente de 1%, la quantité de glyphosate achetée augmente de 0.927%.
+
+Lorsque la sau augmente de 1%, la quantité de glyphosate achetée baisse de 0.349%.
+
+Lorsque la part de céréales dans la sau augmente de 1%, la quantité de glyphosate achetée augmente de 0.02%.
+
+Lorsque la part de vignes dans la sau augmente de 1%, la quantité de glyphosate achetée 0.016%.
+
+
+Tout ces paramètres sont significatifs au seuil de 5%, sauf la constante qui est significative au seuil de 10%.
+
+La part de la variance expliquée par notre modèle est de 73.9%, et celui-ci est globalement significatif.
+
+## 5.2 Performance du modèle
+```{r}
+check_collinearity(mco1)
+```
+
+Aucune colinéarité extrème n'est détéctée dans notre modèle, ce qui permet d'ecarter le risque de surajustement.
+
+```{r}
+check_outliers(mco1)
+```
+
+Les deux outliers détéctés sont Paris et les hauts-de-Seine. Paris et son agglomeration ne possèdent pas de cultures significatives. Ainsi, cette justification explique ces outliers. De ce fait, nous avosn décidé de les garder dans notre base de données.
+
+```{r, echo=FALSE, fig.width=8, fig.height=5}
+check_predictions(mco1)
+```
+
+D'après ce graphique de prédictions, les estimations de notre modèle se rapprochent des valeurs observées. Notre modèle est donc performant.
+
+```{r}
+check_singularity(mco1, vcov = vcovHC, type = "HC1")
+```
+
+D'après le test ci-dessus, notre modèle n'est pas singulier (aucune des dimensions de la matrice des variance-covariance n'est nulle). Ainsi, le risque de surajustement et le risque de problèmes numeriques et de mauvaises convergences sont moins élevées pour notre modèle. 
+
+# 6 Conclusion
+
+**Conclusion**
+
+Notre étude a permis de développer un modèle économétrique robuste visant à estimer les quantités de glyphosate achetées en France, en fonction de divers facteurs agricoles significatifs: la surface agricole utilisée, la production brute standardisée, ainsi que les parts respectives de cultures de vignes et de céréales dans la surface agricole utilisable, ces données étant agrégées par département.
+
+Le modèle a démontré une capacité à générer des estimations qui se rapprochent significativement des valeurs observées, comme le montre notre test de prédictions. Cela indique une bonne adéquation du modèle avec les données réelles, renforçant ainsi sa validité pour des applications futures dans des études similaires ou des politiques agricoles. 
+
+L'approche retenue a révélé quelques défis, notamment la présence d'hétéroscédasticité, que nous avons réussi à corriger, et la mesure imparfaite de certaines variables, comme la surface agricole utilisable (SAU) dopnt le signe du paramètre qui n'etait pas conforme à nos intuitions de départ malgré sa significativité. Néanmoins, le modèle reste exempt de colinéarité extrême et est statistiquement non singulier, ce qui renforce la fiabilité des coefficients estimés.
+
+Les restrictions du modèle, telles que l'impossibilité d'ajouter des variables au carré en raison de la multicollinéarité élevée (VIF), ont été abordées par des méthodes adaptatives et prudentes, garantissant ainsi que le modèle reste robuste et pertinent malgré ces contraintes.
+
+En conclusion, ce projet a non seulement permis de comprendre mieux les dynamiques de vente du glyphosate en relation avec l'utilisation des terres agricoles en France, mais il offre également une base solide pour des recherches futures. Ces recherches pourraient explorer des variables additionnelles ou affiner davantage les méthodes de correction des erreurs de mesure pour améliorer la précision des prévisions.
